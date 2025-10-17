@@ -302,7 +302,8 @@
                     
                     <!-- Agent to storage/services -->
                     <line class="arrow" id="a4" x1="380" y1="280" x2="210" y2="280" />
-                    <line class="arrow" id="a5" x1="600" y1="280" x2="740" y2="280" />
+                    <line class="arrow" id="a8" x1="600" y1="270" x2="660" y2="270" />
+                    <line class="arrow" id="a5" x1="600" y1="290" x2="740" y2="290" />
                     
                     <!-- Agent to outputs -->
                     <line class="arrow" id="a6" x1="420" y1="340" x2="280" y2="400" />
@@ -314,9 +315,10 @@
                 <div class="flow-label" id="l2" style="top: 200px; left: 400px;">4. Fetch logs</div>
                 <div class="flow-label" id="l3" style="top: 200px; right: 210px;">1. Trigger every 5 min</div>
                 <div class="flow-label" id="l4" style="top: 250px; left: 260px;">5. Get baseline</div>
-                <div class="flow-label" id="l5" style="top: 250px; right: 160px;">7. LLM analysis</div>
-                <div class="flow-label" id="l6" style="bottom: 140px; left: 300px;">6. Calculate Z-score</div>
-                <div class="flow-label" id="l7" style="bottom: 140px; right: 240px;">8. Send alert</div>
+                <div class="flow-label" id="l8" style="top: 250px; right: 390px;">6. RAG context</div>
+                <div class="flow-label" id="l5" style="top: 270px; right: 160px;">8. LLM analysis</div>
+                <div class="flow-label" id="l6" style="bottom: 140px; left: 300px;">7. Calculate Z-score</div>
+                <div class="flow-label" id="l7" style="bottom: 140px; right: 240px;">9. Send alert</div>
 
                 <!-- Components -->
                 <div class="component prom" data-id="prom">
@@ -360,6 +362,11 @@
                     <div class="comp-sub">Webhook alerts<br>#latency-alerts</div>
                 </div>
 
+                <div class="component vector-db" data-id="vectordb" style="top: 240px; right: 320px; width: 200px;">
+                    <div class="comp-title">🗄️ Vector DB</div>
+                    <div class="comp-sub">Pinecone/Weaviate<br>RAG knowledge base</div>
+                </div>
+
                 <div class="controls">
                     <button class="btn" onclick="start()">Start</button>
                     <button class="btn next-btn" id="nextBtn" onclick="next()" disabled>Next Step →</button>
@@ -377,8 +384,10 @@
                     <p><strong>3.</strong> Agent fetches baseline from DynamoDB (7-day rolling average)</p>
                     <p><strong>4.</strong> Rules engine calculates Z-score: <code>(current - mean) / stddev</code></p>
                     <p><strong>5.</strong> If Z-score > 2: Query Humio logs for ±5min context</p>
-                    <p><strong>6.</strong> Send metrics + logs to Bedrock LLM for root cause analysis</p>
-                    <p><strong>7.</strong> Post intelligent alert to Slack with analysis + charts</p>
+                    <p><strong>6.</strong> <strong>RAG:</strong> Embed incident → query Vector DB for similar past incidents + runbooks</p>
+                    <p><strong>7.</strong> Send to Bedrock LLM: current metrics + logs + RAG context → get root cause analysis</p>
+                    <p><strong>8.</strong> Post intelligent alert to Slack with analysis + historical context + charts</p>
+                    <p><strong>9.</strong> Store this incident in Vector DB for future RAG queries</p>
                 </div>
 
                 <div class="info-box">
@@ -508,6 +517,29 @@
                 <h3>Options</h3>
                 <p>Slack / PagerDuty / Email (chose Slack for rich formatting)</p>
                 <div class="tech-tag">Webhooks</div><div class="tech-tag">Rich blocks</div><div class="tech-tag">Charts</div>`
+            },
+            vectordb: {
+                title: '🗄️ Vector DB (RAG)',
+                content: `<h3>What</h3>
+                <p>Stores embeddings of: past incidents, runbooks, architecture docs, error patterns. Enables semantic search.</p>
+                <h3>Why RAG is CRITICAL here</h3>
+                <p><strong>Without RAG:</strong> LLM only sees current spike data. No memory, no domain knowledge.</p>
+                <p><strong>With RAG:</strong> Agent searches vector DB for similar past incidents → sends top 5 matches to LLM as context.</p>
+                <p><strong>Example:</strong> "Similar spike Oct 1st: DB pool exhausted during batch job. Fix: increase pool size or schedule batch off-peak."</p>
+                <h3>What gets stored</h3>
+                <p>• Past incidents (embedded as: endpoint + error pattern + root cause)<br>
+                • Runbooks ("when you see X error, do Y")<br>
+                • Architecture docs (service dependencies, configs)<br>
+                • Known issues from Jira/tickets</p>
+                <h3>How it works</h3>
+                <p><strong>1. Index phase:</strong> Embed all historical data using Bedrock Titan Embeddings<br>
+                <strong>2. Query phase:</strong> Agent embeds current incident → searches for top 5 similar vectors<br>
+                <strong>3. Augment prompt:</strong> Send to LLM: current data + retrieved context</p>
+                <h3>Where</h3>
+                <p>Pinecone (managed) or Weaviate (self-hosted). Updated after each incident.</p>
+                <h3>Options</h3>
+                <p>Pinecone / Weaviate / ChromaDB / pgvector (chose Pinecone for managed + fast)</p>
+                <div class="tech-tag">Pinecone</div><div class="tech-tag">Bedrock Embeddings</div><div class="tech-tag">RAG</div><div class="tech-tag">Semantic search</div>`
             }
         };
 
@@ -518,8 +550,9 @@
             { comp: 'prom', arrows: ['a1'], labels: ['l1'] },       // Agent queries Prometheus
             { comp: 'humio', arrows: ['a2'], labels: ['l2'] },      // Agent fetches Humio logs
             { comp: 'dynamo', arrows: ['a4'], labels: ['l4'] },     // Agent gets baseline from DynamoDB
+            { comp: 'vectordb', arrows: ['a8'], labels: ['l8'] },   // Agent queries Vector DB for RAG context
             { comp: 'rules', arrows: ['a6'], labels: ['l6'] },      // Agent calculates Z-score
-            { comp: 'bedrock', arrows: ['a5'], labels: ['l5'] },    // Agent calls Bedrock LLM
+            { comp: 'bedrock', arrows: ['a5'], labels: ['l5'] },    // Agent calls Bedrock LLM with RAG context
             { comp: 'slack', arrows: ['a7'], labels: ['l7'] }       // Agent posts to Slack
         ];
 
@@ -641,6 +674,11 @@
                 </div>
             `;
         }
+
+        // Initialize on page load - show everything by default (reset mode)
+        window.addEventListener('DOMContentLoaded', function() {
+            reset();
+        });
     </script>
 </body>
 </html>
