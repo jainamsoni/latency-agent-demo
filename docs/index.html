@@ -302,11 +302,11 @@
                     
                     <!-- Agent to storage/services -->
                     <line class="arrow" id="a4" x1="380" y1="280" x2="210" y2="280" />
-                    <line class="arrow" id="a8" x1="600" y1="270" x2="660" y2="270" />
-                    <line class="arrow" id="a5" x1="600" y1="290" x2="740" y2="290" />
-                    
+                    <line class="arrow" id="a5" x1="600" y1="280" x2="740" y2="280" />
+
                     <!-- Agent to outputs -->
                     <line class="arrow" id="a6" x1="420" y1="340" x2="280" y2="400" />
+                    <line class="arrow" id="a8" x1="520" y1="340" x2="580" y2="400" />
                     <line class="arrow" id="a7" x1="540" y1="340" x2="720" y2="400" />
                 </svg>
 
@@ -315,9 +315,9 @@
                 <div class="flow-label" id="l2" style="top: 200px; left: 400px;">4. Fetch logs</div>
                 <div class="flow-label" id="l3" style="top: 200px; right: 210px;">1. Trigger every 5 min</div>
                 <div class="flow-label" id="l4" style="top: 250px; left: 260px;">5. Get baseline</div>
-                <div class="flow-label" id="l8" style="top: 250px; right: 390px;">6. RAG context</div>
-                <div class="flow-label" id="l5" style="top: 270px; right: 160px;">8. LLM analysis</div>
+                <div class="flow-label" id="l5" style="top: 250px; right: 160px;">8. LLM analysis</div>
                 <div class="flow-label" id="l6" style="bottom: 140px; left: 300px;">7. Calculate Z-score</div>
+                <div class="flow-label" id="l8" style="bottom: 140px; right: 450px;">6. RAG context</div>
                 <div class="flow-label" id="l7" style="bottom: 140px; right: 240px;">9. Send alert</div>
 
                 <!-- Components -->
@@ -362,7 +362,7 @@
                     <div class="comp-sub">Webhook alerts<br>#latency-alerts</div>
                 </div>
 
-                <div class="component vector-db" data-id="vectordb" style="top: 240px; right: 320px; width: 200px;">
+                <div class="component vector-db" data-id="vectordb" style="top: 380px; right: 380px; width: 200px;">
                     <div class="comp-title">🗄️ Vector DB</div>
                     <div class="comp-sub">Pinecone/Weaviate<br>RAG knowledge base</div>
                 </div>
