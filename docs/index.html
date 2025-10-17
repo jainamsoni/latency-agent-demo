@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Latency Monitor Agent - Cloud Architecture</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 { font-size: 28px; color: white; margin-bottom: 6px; }
+        .header p { font-size: 14px; color: rgba(255,255,255,0.9); }
+
+        .main {
+            display: grid;
+            grid-template-columns: 1000px 1fr;
+            gap: 0;
+            overflow: hidden;
+        }
+
+        .diagram-area {
+            background: white;
+            position: relative;
+            padding: 40px;
+            border-right: 3px solid #e2e8f0;
+        }
+
+        .info-area {
+            background: #f8fafc;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .info-area h2 {
+            font-size: 20px;
+            color: #3b82f6;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .info-box {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-left: 4px solid #3b82f6;
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .info-box h3 {
+            font-size: 15px;
+            color: #0f172a;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .info-box p {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #475569;
+            margin-bottom: 8px;
+        }
+
+        .info-box strong { color: #1e293b; }
+        .info-box code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #0ea5e9;
+            font-family: 'Courier New', monospace;
+        }
+
+        .tech-tag {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            margin: 4px 4px 0 0;
+            font-weight: 600;
+        }
+
+        .component {
+            position: absolute;
+            background: white;
+            border: 2px solid #cbd5e0;
+            border-radius: 10px;
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .component.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .component:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+            transform: translateY(-3px);
+        }
+
+        .component.active {
+            border-color: #f59e0b;
+            border-width: 3px;
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+            background: #fffbeb;
+            z-index: 10;
+        }
+
+        .comp-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+
+        .comp-sub {
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        .layer-label {
+            position: absolute;
+            left: 10px;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        /* Cloud section */
+        .cloud-box {
+            position: absolute;
+            border: 3px dashed #3b82f6;
+            border-radius: 16px;
+            background: rgba(59, 130, 246, 0.03);
+        }
+
+        .cloud-label {
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            background: #3b82f6;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        /* Agent - prominent */
+        .agent {
+            top: 240px;
+            left: 380px;
+            width: 220px;
+            height: 100px;
+            background: linear-gradient(135deg, #3b82f6, #1e40af) !important;
+            border: 3px solid #2563eb !important;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .agent .comp-title { color: white; font-size: 16px; }
+        .agent .comp-sub { color: rgba(255,255,255,0.95); }
+
+        .agent-badge {
+            position: absolute;
+            top: -18px;
+            background: #f59e0b;
+            color: white;
+            padding: 5px 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        /* Component positions */
+        .prom { top: 80px; left: 50px; width: 180px; }
+        .humio { top: 80px; left: 250px; width: 180px; }
+        .trigger { top: 80px; right: 80px; width: 200px; }
+        
+        .dynamo { top: 240px; left: 50px; width: 160px; }
+        .bedrock { top: 240px; right: 80px; width: 200px; }
+        
+        .rules { top: 380px; left: 150px; width: 180px; }
+        .slack { top: 380px; right: 150px; width: 180px; }
+
+        svg { position: absolute; top: 0; left: 0; pointer-events: none; width: 100%; height: 520px; }
+        .arrow { stroke: #94a3b8; stroke-width: 2.5; fill: none; marker-end: url(#arr); }
+        .arrow.active { stroke: #3b82f6; stroke-width: 3.5; stroke-dasharray: 6 4; animation: dash 1.5s linear infinite; }
+        
+        @keyframes dash { to { stroke-dashoffset: -20; } }
+
+        .flow-label {
+            position: absolute;
+            background: #f59e0b;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .flow-label.active { opacity: 1; }
+
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4); }
+
+        .next-btn {
+            background: #10b981;
+        }
+
+        .next-btn:hover {
+            background: #059669;
+        }
+
+        .next-btn:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Latency Monitor Agent - Cloud Architecture (MVP)</h1>
+            <p>Intelligent anomaly detection with AWS-native services - scalable, maintainable, production-ready</p>
+        </div>
+
+        <div class="main">
+            <div class="diagram-area">
+                <div class="layer-label" style="top: 50px;">DATA SOURCES</div>
+                <div class="layer-label" style="top: 210px;">PROCESSING LAYER</div>
+                <div class="layer-label" style="top: 350px;">OUTPUT</div>
+
+                <div class="cloud-box" style="top: 200px; left: 340px; width: 580px; height: 160px;">
+                    <div class="cloud-label">☁️ AWS CLOUD</div>
+                </div>
+
+                <svg>
+                    <defs><marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                        <polygon points="0 0, 10 3, 0 6" fill="#94a3b8" /></marker></defs>
+
+                    <!-- Data sources to Agent -->
+                    <line class="arrow" id="a1" x1="140" y1="160" x2="450" y2="260" />
+                    <line class="arrow" id="a2" x1="340" y1="160" x2="480" y2="260" />
+                    <line class="arrow" id="a3" x1="740" y1="160" x2="520" y2="260" />
+                    
+                    <!-- Agent to storage/services -->
+                    <line class="arrow" id="a4" x1="380" y1="280" x2="210" y2="280" />
+                    <line class="arrow" id="a5" x1="600" y1="280" x2="740" y2="280" />
+                    
+                    <!-- Agent to outputs -->
+                    <line class="arrow" id="a6" x1="420" y1="340" x2="280" y2="400" />
+                    <line class="arrow" id="a7" x1="540" y1="340" x2="720" y2="400" />
+                </svg>
+
+                <!-- Flow labels -->
+                <div class="flow-label" id="l1" style="top: 200px; left: 260px;">3. Query metrics</div>
+                <div class="flow-label" id="l2" style="top: 200px; left: 400px;">4. Fetch logs</div>
+                <div class="flow-label" id="l3" style="top: 200px; right: 210px;">1. Trigger every 5 min</div>
+                <div class="flow-label" id="l4" style="top: 250px; left: 260px;">5. Get baseline</div>
+                <div class="flow-label" id="l5" style="top: 250px; right: 160px;">7. LLM analysis</div>
+                <div class="flow-label" id="l6" style="bottom: 140px; left: 300px;">6. Calculate Z-score</div>
+                <div class="flow-label" id="l7" style="bottom: 140px; right: 240px;">8. Send alert</div>
+
+                <!-- Components -->
+                <div class="component prom" data-id="prom">
+                    <div class="comp-title">📊 Prometheus</div>
+                    <div class="comp-sub">scdev04:9090<br>P95/P99 metrics</div>
+                </div>
+
+                <div class="component humio" data-id="humio">
+                    <div class="comp-title">📋 Humio</div>
+                    <div class="comp-sub">scdev04<br>App logs & errors</div>
+                </div>
+
+                <div class="component trigger" data-id="trigger">
+                    <div class="comp-title">⏰ EventBridge</div>
+                    <div class="comp-sub">Cron: rate(5 minutes)<br>Triggers Lambda</div>
+                </div>
+
+                <div class="component agent" data-id="agent">
+                    <div class="agent-badge">🤖 AGENT</div>
+                    <div class="comp-title">Latency Monitor</div>
+                    <div class="comp-sub">AWS Lambda (Python)<br>Orchestrates workflow</div>
+                </div>
+
+                <div class="component dynamo" data-id="dynamo">
+                    <div class="comp-title">💾 DynamoDB</div>
+                    <div class="comp-sub">Baseline storage<br>7-day window</div>
+                </div>
+
+                <div class="component bedrock" data-id="bedrock">
+                    <div class="comp-title">🧠 AWS Bedrock</div>
+                    <div class="comp-sub">Llama 3.3 70B<br>Root cause analysis</div>
+                </div>
+
+                <div class="component rules" data-id="rules">
+                    <div class="comp-title">📐 Rules Engine</div>
+                    <div class="comp-sub">Z-score calculation<br>(Python code in Lambda)</div>
+                </div>
+
+                <div class="component slack" data-id="slack">
+                    <div class="comp-title">💬 Slack</div>
+                    <div class="comp-sub">Webhook alerts<br>#latency-alerts</div>
+                </div>
+
+                <div class="controls">
+                    <button class="btn" onclick="start()">Start</button>
+                    <button class="btn next-btn" id="nextBtn" onclick="next()" disabled>Next Step →</button>
+                    <button class="btn" onclick="reset()">Reset</button>
+                </div>
+            </div>
+
+            <div class="info-area" id="info">
+                <h2>Architecture Overview</h2>
+
+                <div class="info-box">
+                    <h3>🎯 Workflow (Every 5 Minutes)</h3>
+                    <p><strong>1.</strong> EventBridge triggers Lambda agent every 5 minutes</p>
+                    <p><strong>2.</strong> Agent queries Prometheus API for current P95 latency per endpoint</p>
+                    <p><strong>3.</strong> Agent fetches baseline from DynamoDB (7-day rolling average)</p>
+                    <p><strong>4.</strong> Rules engine calculates Z-score: <code>(current - mean) / stddev</code></p>
+                    <p><strong>5.</strong> If Z-score > 2: Query Humio logs for ±5min context</p>
+                    <p><strong>6.</strong> Send metrics + logs to Bedrock LLM for root cause analysis</p>
+                    <p><strong>7.</strong> Post intelligent alert to Slack with analysis + charts</p>
+                </div>
+
+                <div class="info-box">
+                    <h3>📊 Baseline Creation (Initial Setup)</h3>
+                    <p><strong>Historical data:</strong> Prometheus already has 15 days of retention. Agent queries 7-day range on first run.</p>
+                    <p><strong>Calculation:</strong> For each endpoint, calculate: <code>mean_p95, stddev, min, max</code> from last 7 days</p>
+                    <p><strong>Storage:</strong> Store in DynamoDB: <code>{endpoint_name: {baseline_mean, stddev, updated_timestamp}}</code></p>
+                    <p><strong>Updates:</strong> Recalculated daily at 2am (Lambda on cron schedule) to maintain 7-day rolling window</p>
+                    <p><strong>Cold start:</strong> First 7 days in "observation mode" - collect data, no alerts. Day 8: baseline ready, alerts enabled.</p>
+                </div>
+
+                <div class="info-box">
+                    <h3>🤔 Honest Take: Do We Actually Need This?</h3>
+                    <p><strong>What Prometheus already does:</strong> Alerts when P95 > threshold. Posts to Slack: "🚨 Latency high on /api/users: 380ms"</p>
+                    <p><strong>What this agent adds:</strong></p>
+                    <p>✅ <strong>Adaptive thresholds:</strong> Z-score adapts to each endpoint's variance. Prometheus uses fixed thresholds (one size fits all).</p>
+                    <p>✅ <strong>Context correlation:</strong> Agent pulls logs from Humio around spike time. Prometheus alert = blind, no logs/context.</p>
+                    <p>✅ <strong>Root cause analysis:</strong> LLM reads baseline + current metrics + error logs → explains "DB pool exhausted after pod restart". Prometheus: just says "latency high".</p>
+                    <p>✅ <strong>Reduces noise:</strong> Z-score prevents alerts on normal variance. Prometheus threshold = frequent false positives.</p>
+                    <p><strong>Real value?</strong> If team already investigates every Prometheus alert manually (check Humio, check Grafana, guess root cause), this automates that. Saves 5-10 min per incident. If 10 incidents/week = 1 hour saved.</p>
+                    <p><strong>Not worth it if:</strong> Prometheus alerts are rare, team doesn't investigate deeply, or you're happy with "latency high" notifications.</p>
+                    <p><strong>Worth it if:</strong> High alert volume, team wants root cause hints immediately, or you want smarter alerts that adapt to each endpoint's behavior.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const info = {
+            prom: {
+                title: '📊 Prometheus',
+                content: `<h3>What</h3>
+                <p>Time-series metrics database on scdev04. Stores P95/P99 latency data.</p>
+                <h3>Why</h3>
+                <p>Existing service - already collecting metrics. Agent queries it for current latency.</p>
+                <h3>Where</h3>
+                <p>scdev04:9090 - Agent accesses via VPC or API Gateway.</p>
+                <h3>Options</h3>
+                <p>VPC peering / API Gateway / VPN connection</p>
+                <div class="tech-tag">PromQL</div><div class="tech-tag">15-day retention</div>`
+            },
+            humio: {
+                title: '📋 Humio',
+                content: `<h3>What</h3>
+                <p>Log aggregation on scdev04. Stores app errors, warnings, pod restarts.</p>
+                <h3>Why</h3>
+                <p>Provides context for spikes. Shows WHY latency increased (DB errors, OOM, etc.)</p>
+                <h3>Where</h3>
+                <p>scdev04 - Agent accesses via REST API with token auth.</p>
+                <h3>Options</h3>
+                <p>Query ±5min window around spike time</p>
+                <div class="tech-tag">REST API</div><div class="tech-tag">±5 min window</div>`
+            },
+            trigger: {
+                title: '⏰ EventBridge',
+                content: `<h3>What</h3>
+                <p>Managed cron scheduler. Triggers Lambda every 5 minutes.</p>
+                <h3>Why</h3>
+                <p>No server to maintain. Highly available. Easy to pause/resume.</p>
+                <h3>Where</h3>
+                <p>AWS cloud - triggers Lambda with <code>rate(5 minutes)</code></p>
+                <h3>Options</h3>
+                <p>Cron schedule / Event-based / SNS integration</p>
+                <div class="tech-tag">AWS EventBridge</div><div class="tech-tag">Every 5 min</div><div class="tech-tag">Free tier</div>`
+            },
+            agent: {
+                title: '🤖 Agent (AWS Lambda)',
+                content: `<h3>What</h3>
+                <p>Orchestrator - queries metrics, calculates Z-score, calls LLM, posts alerts.</p>
+                <h3>Why</h3>
+                <p>Auto-scales, no maintenance, free tier covers usage. Highly available.</p>
+                <h3>Where</h3>
+                <p>AWS Lambda - Python code with rules engine built-in.</p>
+                <h3>Why NOT LangChain/LangGraph?</h3>
+                <p><strong>Simple workflow:</strong> Linear flow (query → calculate → LLM → alert). No need for complex orchestration, state machines, or multi-step reasoning.</p>
+                <p><strong>Overhead:</strong> LangChain adds 50+ dependencies, slower cold starts, more complexity.</p>
+                <p><strong>Direct is better:</strong> Simple Python + boto3 + requests = faster, easier to debug, no abstraction layers.</p>
+                <p><strong>When to use LangChain:</strong> Multi-agent systems, RAG with vector DBs, complex tool calling chains. This is a single-agent linear workflow.</p>
+                <h3>Options</h3>
+                <p>Plain Python / LangChain / LangGraph (chose plain Python for MVP simplicity)</p>
+                <div class="tech-tag">AWS Lambda</div><div class="tech-tag">Python 3.11</div><div class="tech-tag">No LangChain</div><div class="tech-tag">boto3 + requests</div>`
+            },
+            dynamo: {
+                title: '💾 DynamoDB',
+                content: `<h3>What</h3>
+                <p>Stores baseline stats: mean, stddev for each endpoint (7-day window).</p>
+                <h3>Why</h3>
+                <p>Fast reads, serverless, built-in TTL for auto-cleanup. Cheap (~$0.25/month).</p>
+                <h3>Where</h3>
+                <p>AWS DynamoDB - table: <code>latency-baselines</code>, key: <code>endpoint_name</code></p>
+                <h3>Options</h3>
+                <p>DynamoDB / Redis / JSON file (chose DynamoDB for TTL + serverless)</p>
+                <div class="tech-tag">DynamoDB</div><div class="tech-tag">7-day TTL</div><div class="tech-tag">Updated daily 2am</div>`
+            },
+            bedrock: {
+                title: '🧠 AWS Bedrock',
+                content: `<h3>What</h3>
+                <p>LLM (Llama 3.3 70B) analyzes spikes. Gets baseline + current metrics + logs → explains root cause.</p>
+                <h3>Why</h3>
+                <p>Provides intelligent analysis, not just alerts. Uses 7-day baseline as context.</p>
+                <h3>Where</h3>
+                <p>AWS Bedrock API - agent sends prompt, gets explanation (~2s response).</p>
+                <h3>Options</h3>
+                <p>Bedrock / Ollama local / OpenAI (chose Bedrock for security + managed)</p>
+                <div class="tech-tag">Llama 3.3 70B</div><div class="tech-tag">~2s latency</div><div class="tech-tag">Prompt-based</div>`
+            },
+            rules: {
+                title: '📐 Rules Engine',
+                content: `<h3>What</h3>
+                <p>Z-score algorithm: <code>z = (current - mean) / stddev</code>. Alert if z > 2.</p>
+                <h3>Why</h3>
+                <p>Adapts to variance. High variance endpoint = less sensitive. Low variance = more sensitive.</p>
+                <h3>Where</h3>
+                <p>Python code inside Lambda (not separate service).</p>
+                <h3>Options</h3>
+                <p>Z-score / Fixed threshold / ML model (chose Z-score for simplicity)</p>
+                <div class="tech-tag">Z-score</div><div class="tech-tag">95% confidence</div><div class="tech-tag">Python in Lambda</div>`
+            },
+            slack: {
+                title: '💬 Slack',
+                content: `<h3>What</h3>
+                <p>Posts alert to #latency-alerts with: Z-score, LLM analysis, dashboard links.</p>
+                <h3>Why</h3>
+                <p>Team gets intelligent alerts with context, not just "latency high".</p>
+                <h3>Where</h3>
+                <p>Slack webhook - agent POSTs rich message blocks with charts.</p>
+                <h3>Options</h3>
+                <p>Slack / PagerDuty / Email (chose Slack for rich formatting)</p>
+                <div class="tech-tag">Webhooks</div><div class="tech-tag">Rich blocks</div><div class="tech-tag">Charts</div>`
+            }
+        };
+
+        let step = 0;
+        const flow = [
+            { comp: 'trigger', arrows: ['a3'], labels: ['l3'] },    // EventBridge triggers Lambda
+            { comp: 'agent', arrows: [], labels: [] },              // Agent wakes up
+            { comp: 'prom', arrows: ['a1'], labels: ['l1'] },       // Agent queries Prometheus
+            { comp: 'humio', arrows: ['a2'], labels: ['l2'] },      // Agent fetches Humio logs
+            { comp: 'dynamo', arrows: ['a4'], labels: ['l4'] },     // Agent gets baseline from DynamoDB
+            { comp: 'rules', arrows: ['a6'], labels: ['l6'] },      // Agent calculates Z-score
+            { comp: 'bedrock', arrows: ['a5'], labels: ['l5'] },    // Agent calls Bedrock LLM
+            { comp: 'slack', arrows: ['a7'], labels: ['l7'] }       // Agent posts to Slack
+        ];
+
+        document.querySelectorAll('.component').forEach(c => {
+            c.addEventListener('click', function() {
+                const id = this.getAttribute('data-id');
+                showInfo(id);
+            });
+        });
+
+        function showInfo(id) {
+            document.querySelectorAll('.component').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[data-id="${id}"]`).classList.add('active');
+            
+            const content = info[id];
+            document.getElementById('info').innerHTML = `<h2>${content.title}</h2><div class="info-box">${content.content}</div>`;
+        }
+
+        function start() {
+            step = 0;
+            // Hide all components
+            document.querySelectorAll('.component').forEach(c => {
+                c.classList.remove('visible');
+                c.classList.remove('active');
+            });
+            document.querySelectorAll('.arrow').forEach(a => a.classList.remove('active'));
+            document.querySelectorAll('.flow-label').forEach(l => l.classList.remove('active'));
+
+            document.getElementById('nextBtn').disabled = false;
+            document.getElementById('info').innerHTML = `
+                <h2>👆 Click "Next Step" to see flow</h2>
+                <div class="info-box">
+                    <h3>Interactive Flow Mode</h3>
+                    <p>Click "Next Step" button to reveal components one by one and see how the system works.</p>
+                    <p>Each step will show you what happens and why.</p>
+                </div>
+            `;
+        }
+
+        function next() {
+            if (step >= flow.length) {
+                document.getElementById('nextBtn').disabled = true;
+                document.getElementById('info').innerHTML = `
+                    <h2>✅ Complete Flow</h2>
+                    <div class="info-box">
+                        <h3>Result: Intelligent Alert Posted</h3>
+                        <p>Team receives Slack message with: Z-score analysis, LLM root cause explanation, relevant logs, and actionable links.</p>
+                        <p><strong>Key Advantages:</strong></p>
+                        <p>• <strong>Scalable:</strong> Lambda auto-scales, handles any load<br>
+                        • <strong>Cost-effective:</strong> Free tier covers our usage<br>
+                        • <strong>Maintainable:</strong> No servers, AWS manages infrastructure<br>
+                        • <strong>Intelligent:</strong> Statistical anomaly detection + LLM analysis<br>
+                        • <strong>Observable:</strong> CloudWatch logs/metrics built-in</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const { comp, arrows, labels } = flow[step];
+
+            // Show component
+            const component = document.querySelector(`[data-id="${comp}"]`);
+            component.classList.add('visible');
+            showInfo(comp);
+
+            // Show arrows and labels
+            arrows.forEach(a => document.getElementById(a).classList.add('active'));
+            labels.forEach(l => document.getElementById(l).classList.add('active'));
+
+            step++;
+
+            if (step >= flow.length) {
+                document.getElementById('nextBtn').disabled = true;
+            }
+        }
+
+        function reset() {
+            step = 0;
+            // Show all components again
+            document.querySelectorAll('.component').forEach(c => {
+                c.classList.add('visible');
+                c.classList.remove('active');
+            });
+            document.querySelectorAll('.arrow').forEach(a => a.classList.remove('active'));
+            document.querySelectorAll('.flow-label').forEach(l => l.classList.remove('active'));
+            document.getElementById('nextBtn').disabled = true;
+            
+            document.getElementById('info').innerHTML = `
+                <h2>Architecture Overview</h2>
+                <div class="info-box">
+                    <h3>🎯 Workflow (Every 5 Minutes)</h3>
+                    <p><strong>1.</strong> EventBridge triggers Lambda agent every 5 minutes</p>
+                    <p><strong>2.</strong> Agent queries Prometheus API for current P95 latency per endpoint</p>
+                    <p><strong>3.</strong> Agent fetches baseline from DynamoDB (7-day rolling average)</p>
+                    <p><strong>4.</strong> Rules engine calculates Z-score: <code>(current - mean) / stddev</code></p>
+                    <p><strong>5.</strong> If Z-score > 2: Query Humio logs for ±5min context</p>
+                    <p><strong>6.</strong> Send metrics + logs to Bedrock LLM for root cause analysis</p>
+                    <p><strong>7.</strong> Post intelligent alert to Slack with analysis + charts</p>
+                </div>
+                <div class="info-box">
+                    <h3>📊 Baseline Creation (Initial Setup)</h3>
+                    <p><strong>Historical data:</strong> Prometheus already has 15 days of retention. Agent queries 7-day range on first run.</p>
+                    <p><strong>Calculation:</strong> For each endpoint, calculate: <code>mean_p95, stddev, min, max</code> from last 7 days</p>
+                    <p><strong>Storage:</strong> Store in DynamoDB: <code>{endpoint_name: {baseline_mean, stddev, updated_timestamp}}</code></p>
+                    <p><strong>Updates:</strong> Recalculated daily at 2am (Lambda on cron schedule) to maintain 7-day rolling window</p>
+                    <p><strong>Cold start:</strong> First 7 days in "observation mode" - collect data, no alerts. Day 8: baseline ready, alerts enabled.</p>
+                </div>
+                <div class="info-box">
+                    <h3>🤔 Honest Take: Do We Actually Need This?</h3>
+                    <p><strong>What Prometheus already does:</strong> Alerts when P95 > threshold. Posts to Slack: "🚨 Latency high on /api/users: 380ms"</p>
+                    <p><strong>What this agent adds:</strong></p>
+                    <p>✅ <strong>Adaptive thresholds:</strong> Z-score adapts to each endpoint's variance. Prometheus uses fixed thresholds (one size fits all).</p>
+                    <p>✅ <strong>Context correlation:</strong> Agent pulls logs from Humio around spike time. Prometheus alert = blind, no logs/context.</p>
+                    <p>✅ <strong>Root cause analysis:</strong> LLM reads baseline + current metrics + error logs → explains "DB pool exhausted after pod restart". Prometheus: just says "latency high".</p>
+                    <p>✅ <strong>Reduces noise:</strong> Z-score prevents alerts on normal variance. Prometheus threshold = frequent false positives.</p>
+                    <p><strong>Real value?</strong> If team already investigates every Prometheus alert manually (check Humio, check Grafana, guess root cause), this automates that. Saves 5-10 min per incident. If 10 incidents/week = 1 hour saved.</p>
+                    <p><strong>Not worth it if:</strong> Prometheus alerts are rare, team doesn't investigate deeply, or you're happy with "latency high" notifications.</p>
+                    <p><strong>Worth it if:</strong> High alert volume, team wants root cause hints immediately, or you want smarter alerts that adapt to each endpoint's behavior.</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
